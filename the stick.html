@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Batalha</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #121212;
+            color: white;
+        }
+        canvas {
+            border: 2px solid #ffffff;
+            display: block;
+            margin: 20px auto;
+            background-color: #333;
+        }
+        .game-over {
+            font-size: 2em;
+            color: red;
+        }
+        .game-won {
+            font-size: 2em;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>A Batalha</h1>
+    <p>Raid: <span id="raid">1</span> | Pontos: <span id="score">0</span> | Vidas: <span id="lives">10</span></p>
+    <canvas id="gameCanvas" width="500" height="300"></canvas>
+    <div id="endMessage" style="display: none;"></div>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const player = { x: 240, y: 140, size: 20, color: "red", lives: 10 };
+        const boss = { x: 200, y: 50, size: 50, color: "orange", health: 50, bullets: [] };
+        let bullets = [];
+        let enemies = [];
+        let score = 0;
+        let raid = 1;
+        let gameOver = false;
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+        }
+
+        function drawEnemies() {
+            enemies.forEach((enemy) => {
+                ctx.fillStyle = "blue";
+                ctx.fillRect(enemy.x, enemy.y, 20, 20);
+            });
+        }
+
+        function drawBoss() {
+            ctx.fillStyle = boss.color;
+            ctx.fillRect(boss.x, boss.y, boss.size, boss.size);
+            ctx.fillStyle = "white";
+            ctx.fillText(`Boss HP: ${boss.health}`, boss.x, boss.y - 10);
+        }
+
+        function drawBullets() {
+            bullets.forEach((bullet) => {
+                ctx.fillStyle = "yellow";
+                ctx.fillRect(bullet.x, bullet.y, 5, 10);
+            });
+            boss.bullets.forEach((bullet) => {
+                ctx.fillStyle = "red";
+                ctx.fillRect(bullet.x, bullet.y, 5, 10);
+            });
+        }
+
+        function updateBullets() {
+            bullets = bullets.filter((bullet) => bullet.y > 0);
+            bullets.forEach((bullet) => {
+                bullet.y -= 5;
+
+                // Colisão com o chefão
+                if (
+                    raid >= 10 &&
+                    bullet.x < boss.x + boss.size &&
+                    bullet.x + 5 > boss.x &&
+                    bullet.y < boss.y + boss.size &&
+                    bullet.y + 10 > boss.y
+                ) {
+                    boss.health--;
+                    if (boss.health <= 0) winGame();
+                }
+
+                // Colisão com inimigos (quadrados azuis)
+                enemies.forEach((enemy, index) => {
+                    if (
+                        bullet.x < enemy.x + 20 &&
+                        bullet.x + 5 > enemy.x &&
+                        bullet.y < enemy.y + 20 &&
+                        bullet.y + 10 > enemy.y
+                    ) {
+                        enemies.splice(index, 1);
+                        score++;
+                        document.getElementById("score").innerText = score;
+                        if (score % 10 === 0) {
+                            raid++;
+                            document.getElementById("raid").innerText = raid;
+                            player.lives = 10; // Recarrega as vidas ao subir de raid
+                            document.getElementById("lives").innerText = player.lives;
+                        }
+                    }
+                });
+            });
+
+            boss.bullets.forEach((bullet) => {
+                bullet.y += 5;
+                if (
+                    bullet.x < player.x + player.size &&
+                    bullet.x + 5 > player.x &&
+                    bullet.y < player.y + player.size &&
+                    bullet.y + 10 > player.y
+                ) {
+                    loseLife();
+                }
+            });
+        }
+
+        function updateEnemies() {
+            enemies.forEach((enemy) => {
+                enemy.y += raid;
+                if (
+                    enemy.x < player.x + player.size &&
+                    enemy.x + 20 > player.x &&
+                    enemy.y < player.y + player.size &&
+                    enemy.y + 20 > player.y
+                ) {
+                    loseLife();
+                }
+            });
+            if (Math.random() < 0.02 * raid) {
+                enemies.push({ x: Math.random() * (canvas.width - 20), y: 0 });
+            }
+        }
+
+        function moveBoss() {
+            if (raid >= 10) {
+                boss.x += Math.random() < 0.5 ? -2 : 2;
+                boss.y += Math.random() < 0.5 ? -1 : 1;
+                if (Math.random() < 0.03) {
+                    boss.bullets.push({ x: boss.x + boss.size / 2, y: boss.y + boss.size });
+                }
+            }
+        }
+
+        function loseLife() {
+            player.lives--;
+            document.getElementById("lives").innerText = player.lives;
+            if (player.lives <= 0) endGame();
+        }
+
+        function winGame() {
+            gameOver = true;
+            document.getElementById("endMessage").style.display = "block";
+            document.getElementById("endMessage").innerHTML = "<div class='game-won'>Você ganhou!</div>";
+        }
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById("endMessage").style.display = "block";
+            document.getElementById("endMessage").innerHTML = "<div class='game-over'>Você morreu!</div>";
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawEnemies();
+            drawBullets();
+            if (raid >= 10) drawBoss();
+            updateBullets();
+            updateEnemies();
+            moveBoss();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowLeft" && player.x > 0) player.x -= 10;
+            if (event.key === "ArrowRight" && player.x < canvas.width - player.size) player.x += 10;
+            if (event.key === "ArrowUp" && player.y > 0) player.y -= 10;
+            if (event.key === "ArrowDown" && player.y < canvas.height - player.size) player.y += 10;
+            if (event.key === "e") {
+                bullets.push({ x: player.x + player.size / 2 - 2, y: player.y });
+            }
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
